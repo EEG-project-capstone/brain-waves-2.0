@@ -216,7 +216,7 @@ def handle_stimulus_administration():
     with left_col:
         loved_one_stim_selected = st.checkbox("loved_one_stim", key="loved_one_checkbox")
     with middle_col:
-        st.session_state.audio_stim.family_member_gender = st.radio("Select Family Member Gender", ('Male', 'Female'), horizontal=True, disabled=not loved_one_stim_selected)
+        st.session_state.audio_stim.loved_one_gender = st.radio("Select Family Member Gender", ('Male', 'Female'), horizontal=True, disabled=not loved_one_stim_selected)
     with right_col:
         st.session_state.audio_stim.loved_one_file = st.file_uploader("Upload Loved One's Voice", type=['wav', 'mp3'], disabled=not loved_one_stim_selected)
 

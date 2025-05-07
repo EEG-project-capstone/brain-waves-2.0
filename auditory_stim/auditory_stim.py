@@ -3,12 +3,12 @@ import os
 import random
 import yaml
 import streamlit as st
-import pydub
 from pydub import AudioSegment
 from pydub.generators import Sine
 from pydub.playback import play
-
 import sounddevice as sd
+import numpy as np
+
 
 class AuditoryStimulator:
 
@@ -52,6 +52,29 @@ class AuditoryStimulator:
         self.loved_one_voice_audio = None
         self.control_voice_audio = None
 
+        # import numpy as np
+        # import sounddevice as sd
+
+        # from pydub.utils import ratio_to_db
+
+        # # Generate test tones
+        # fs = 44100
+        # tone1 = 0.5 * np.sin(2 * np.pi * 440 * np.arange(fs * 2) / fs)  # 2 sec tone
+        # tone2 = 0.3 * np.sin(2 * np.pi * 880 * np.arange(fs * 2) / fs)  # Quieter tone
+
+        # def adaptive_volume(audio_segment, threshold_db=-20):
+        #     rms = audio_segment.rms
+        #     if rms > threshold_db:
+        #         return audio_segment - 6  # Reduce loud segments
+        #     return audio_segment
+
+        # instruction = adaptive_volume(tone1)
+        # feedback = adaptive_volume(tone2)
+
+
+
+
+
     def generate_trials(self, num_of_each_trials):      
         # generate random set of trials
         trial_names = []
@@ -89,18 +112,25 @@ class AuditoryStimulator:
                     # path to loved ones voice recording
                     temp_path = os.path.join("audio_data/static/", self.loved_one_file.name)
                     # add loved ones voice recording 
-                    self.loved_one_voice_audio = AudioSegment.from_mp3(temp_path)
+                    self.loved_one_voice_audio = AudioSegment.from_wav(temp_path)
                     # add a gendered control voice recording 
                     if self.loved_one_gender == 'Male':
-                        self.control_voice_audio = AudioSegment.from_mp3(self.config['male_control_path'])
+                        self.control_voice_audio = AudioSegment.from_wav(self.config['male_control_path'])
+                        print("added male control")
                     elif self.loved_one_gender == 'Female':
-                        self.control_voice_audio = AudioSegment.from_mp3(self.config['female_control_path'])
+                        # self.control_voice_audio = AudioSegment.from_wav(self.config['female_control_path'])
+                        self.control_voice_audio = AudioSegment.from_wav('audio_data/static/ControlStatement_female.wav')
+                        print("added female control")
+                    else:
+                        print("no control audio was added")
                     # add loved ones or control voice recording
                     trial_names += ['control'] * num_of_each_trials[key]
                     trial_names += ['loved_one'] * num_of_each_trials[key]
 
         # shuffle the trials to be random
         random.shuffle(trial_names)
+
+        trial_names = ['sync'] + trial_names
 
         return trial_names
     
@@ -110,7 +140,10 @@ class AuditoryStimulator:
         sentences = []
 
         # administered correct 
-        if trial[:4] == "lang":
+        if trial == "sync":
+            print("abouit to play sync")
+            start_time, end_time = self._administer_sync()
+        elif trial[:4] == "lang":
             start_time, end_time, sentences = self._administer_lang(trial)
         elif trial == "rcmd":
             start_time, end_time = self._administer_right_cmd()
@@ -176,14 +209,14 @@ class AuditoryStimulator:
         # save sample IDs
         self.lang_trials_ids.append(sample_ids)
 
-    def _list_output_devices(self):
-        """List all available audio output devices"""
-        devices = sd.query_devices()
-        output_devices = []
-        for i, dev in enumerate(devices):
-            if dev['max_output_channels'] > 0:
-                output_devices.append((i, dev['name']))
-        return output_devices
+    # def _list_output_devices(self):
+    #     """List all available audio output devices"""
+    #     devices = sd.query_devices()
+    #     output_devices = []
+    #     for i, dev in enumerate(devices):
+    #         if dev['max_output_channels'] > 0:
+    #             output_devices.append((i, dev['name']))
+    #     return output_devices
 
     def _administer_lang(self, trial):
 
@@ -248,9 +281,12 @@ class AuditoryStimulator:
         for _ in range(5):
             audio_segment = Sine(1000).to_audio_segment(duration=100)
             samples = audio_segment.get_array_of_samples()
-            sd.play(samples, audio_segment.frame_rate, device=1)
+            sd.play(samples, audio_segment.frame_rate, device=0)
             sd.wait()
             sentences.append('standard')
+            
+            # sleep for 1 seconds
+            time.sleep(1)
 
         # play 20 standard or rare tones 
         for i in range(20):
@@ -258,16 +294,19 @@ class AuditoryStimulator:
             if random.random() < 0.2:
                 audio_segment = Sine(2000).to_audio_segment(duration=100)
                 samples = audio_segment.get_array_of_samples()
-                sd.play(samples, audio_segment.frame_rate, device=1)
+                sd.play(samples, audio_segment.frame_rate, device=0)
                 sd.wait()
                 sentences.append('rare')
             # else play standard tone 
             else:
                 audio_segment = Sine(1000).to_audio_segment(duration=100)
                 samples = audio_segment.get_array_of_samples()
-                sd.play(samples, audio_segment.frame_rate, device=1)
+                sd.play(samples, audio_segment.frame_rate, device=0)
                 sd.wait()
-                sentences.append('standard')  
+                sentences.append('standard') 
+            # sleep for 1 seconds
+            time.sleep(1)
+ 
                     
         end_time = time.time()
 
@@ -281,10 +320,43 @@ class AuditoryStimulator:
         print(f"Playing control recording")
         play(self.control_voice_audio)
         end_time = time.time()
+        time.sleep(5)
         return start_time, end_time
 
     def _administer_loved_one(self):
         start_time = time.time()
+        print(f"Playing loved one recording")
         play(self.loved_one_voice_audio)
         end_time = time.time()
+        time.sleep(5)
+        return start_time, end_time
+    
+    def _administer_sync(self):
+        start_time = time.time()
+        print(f"Playing sync")
+
+        # # Generate square wave (50% duty cycle)
+        # square_wave = np.array()
+        # for _ in range(10):
+        #     square_wave.append(1)
+
+        # # Play once
+        # sd.play(square_wave, 44100)
+        # sd.wait()  # Wait until playback finishes
+
+        # Configuration
+        FREQ = 440    # Frequency (Hz) - A4 musical note
+        DURATION = 1  # Seconds
+        VOLUME = 0.5  # 0.0 (silent) to 1.0 (max)
+
+        # Generate square wave (50% duty cycle)
+        t = np.linspace(0, DURATION, int(44100 * DURATION), False)
+        square_wave = VOLUME * np.sign(np.sin(2 * np.pi * FREQ * t))
+
+        # Play once
+        sd.play(square_wave, 44100)
+        sd.wait()  # Wait until playback finishes
+
+        end_time = time.time()
+        time.sleep(5)
         return start_time, end_time
